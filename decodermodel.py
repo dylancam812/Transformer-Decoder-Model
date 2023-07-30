@@ -77,10 +77,10 @@ class Head(nn.Module):
 class MultiHeadAttention(nn.Module):
     """ Multi head self-attention """
 
-    def __init__(self, num_heads, head_size):
+    def __init__(self, numHeads, headSize):
         super().__init__()
-        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
-        self.proj = nn.Linear(head_size * num_heads, embed)
+        self.heads = nn.ModuleList([Head(headSize) for _ in range(numHeads)])
+        self.proj = nn.Linear(headSize * numHeads, embed)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
@@ -108,8 +108,8 @@ class Block(nn.Module):
 
     def __init__(self, embed, head):
         super().__init__()
-        head_size = embed // head
-        self.sa = MultiHeadAttention(head, head_size)
+        headSize = embed // head
+        self.sa = MultiHeadAttention(head, headSize)
         self.ffwd = FeedFoward(embed)
         self.ln1 = nn.LayerNorm(embed)
         self.ln2 = nn.LayerNorm(embed)
@@ -119,7 +119,7 @@ class Block(nn.Module):
         x = x + self.ffwd(self.ln2(x))
         return x
 
-class GPTLanguageModel(nn.Module):
+class DecoderModel(nn.Module):
     """ Decoder model """
 
     def __init__(self):
@@ -127,8 +127,8 @@ class GPTLanguageModel(nn.Module):
         self.tokenEmbeddingTable = nn.Embedding(vocabSize, embed)
         self.positionEmbeddingTable = nn.Embedding(block, embed)
         self.blocks = nn.Sequential(*[Block(embed, head=head) for _ in range(layer)])
-        self.ln_f = nn.LayerNorm(embed) 
-        self.lm_head = nn.Linear(embed, vocabSize)
+        self.lnf = nn.LayerNorm(embed) 
+        self.lmHead = nn.Linear(embed, vocabSize)
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
@@ -145,8 +145,8 @@ class GPTLanguageModel(nn.Module):
         positionEmbed = self.positionEmbeddingTable(torch.arange(T, device=device)) 
         x = tokenEmbed + positionEmbed 
         x = self.blocks(x) 
-        x = self.ln_f(x) 
-        logits = self.lm_head(x) 
+        x = self.lnf(x) 
+        logits = self.lmHead(x) 
         if targets is None:
             loss = None
         else:
@@ -156,17 +156,17 @@ class GPTLanguageModel(nn.Module):
             loss = F.cross_entropy(logits, targets)
         return logits, loss
 
-    def generate(self, idx, max_new_tokens):
-        for _ in range(max_new_tokens):
-            idx_cond = idx[:, -block:]
-            logits, loss = self(idx_cond)
+    def generate(self, idx, maxNewTokens):
+        for _ in range(maxNewTokens):
+            idxCond = idx[:, -block:]
+            logits, loss = self(idxCond)
             logits = logits[:, -1, :] 
             probs = F.softmax(logits, dim=-1) 
             next = torch.multinomial(probs, numSamples=1) 
             idx = torch.cat((idx, next), dim=1) 
         return idx
 
-model = GPTLanguageModel()
+model = DecoderModel()
 m = model.to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=learningRate)
 
